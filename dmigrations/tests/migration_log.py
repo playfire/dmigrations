@@ -1,7 +1,7 @@
-from gcap.apps.dmigrations.tests.common import *
-from gcap.apps.dmigrations.migration_state import MigrationState
-from gcap.apps.dmigrations.migration_db import MigrationDb
-from gcap.apps.dmigrations.migration_log import get_log
+from dmigrations.tests.common import *
+from dmigrations.migration_state import MigrationState
+from dmigrations.migration_db import MigrationDb
+from dmigrations.migration_log import get_log
 from datetime import datetime, date, time
 
 class MigrationLogTest(TestCase):

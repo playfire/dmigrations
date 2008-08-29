@@ -1,18 +1,9 @@
-from gcap.apps.dmigrations.tests.common import *
-from gcap.apps.dmigrations.migration_state import MigrationState
-from gcap.apps.dmigrations.migration_db import MigrationDb
-
-create_old = """
-CREATE TABLE `smigrations_schema` (
-  `id` int(11) NOT NULL auto_increment,
-  `version` int(11) NOT NULL,
-  `scratch_version` int(11) NOT NULL,
-   PRIMARY KEY  (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8
-"""
+from dmigrations.tests.common import *
+from dmigrations.migration_state import MigrationState
+from dmigrations.migration_db import MigrationDb
 
 create_new = """
-CREATE TABLE `migrations` (
+CREATE TABLE `dmigrations` (
   `id` int(11) NOT NULL auto_increment,
   `migration` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`id`)
@@ -20,111 +11,29 @@ CREATE TABLE `migrations` (
 """
 
 class MigrationStateTest(TestCase):
-  """
-  Test migration from the old migration system to the new migration system.
-  It messes in the database, so is likely to break if you change the test loader.
-  """
-  
   def set_up(self):
     from django.db import connection
     self.cursor = connection.cursor()
 
-    try: self.cursor.execute("DROP TABLE smigrations_schema")
+    try: self.cursor.execute("DROP TABLE dmigrations")
     except: pass
-    try: self.cursor.execute("DROP TABLE migrations")
-    except: pass
-
-  def set_schema_version(self, number):
-    self.cursor.execute("DELETE FROM smigrations_schema")
-    self.cursor.execute("INSERT INTO smigrations_schema VALUES (1, %d, 0)" % number)
 
   def test_table_present_methods(self):
     si = MigrationState()
 
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(False, si.new_migration_table_present())
-
-    self.cursor.execute(create_old)
-
-    self.assert_equal(True, si.old_migration_table_present())
     self.assert_equal(False, si.new_migration_table_present())
 
     self.cursor.execute(create_new)
 
-    self.assert_equal(True, si.old_migration_table_present())
     self.assert_equal(True, si.new_migration_table_present())
-    
-    self.cursor.execute("DROP TABLE smigrations_schema")
-    
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
- 
-  def test_list_of_old_migrations_applied(self):
-    self.cursor.execute(create_old)
-
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '005_hello'])
-    si = MigrationState(migration_db=db)
-
-    self.set_schema_version(1)
-    self.assert_equal(["001_foo"], si.list_of_old_migrations_applied())
-    self.set_schema_version(2)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(3)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(4)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(5)
-    self.assert_equal(["001_foo", "002_bar", "005_hello"], si.list_of_old_migrations_applied())
-    self.set_schema_version(6)
-    self.assert_equal(["001_foo", "002_bar", "005_hello"], si.list_of_old_migrations_applied())
-
-  def test_list_of_old_migrations_applied_dev(self):
-    self.cursor.execute(create_old)
-
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '003_DEV_kitty', '005_hello'])
-    si = MigrationState(migration_db=db, dev=True)
-
-    self.set_schema_version(1)
-    self.assert_equal(["001_foo"], si.list_of_old_migrations_applied())
-    self.set_schema_version(2)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(3)
-    self.assert_equal(["001_foo", "002_bar", '003_DEV_kitty'], si.list_of_old_migrations_applied())
-    self.set_schema_version(4)
-    self.assert_equal(["001_foo", "002_bar", '003_DEV_kitty'], si.list_of_old_migrations_applied())
-    self.set_schema_version(5)
-    self.assert_equal(["001_foo", "002_bar", '003_DEV_kitty', "005_hello"], si.list_of_old_migrations_applied())
-    self.set_schema_version(6)
-    self.assert_equal(["001_foo", "002_bar", '003_DEV_kitty', "005_hello"], si.list_of_old_migrations_applied())
-
-  def test_list_of_old_migrations_applied_nodev(self):
-    self.cursor.execute(create_old)
-
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '003_DEV_kitty', '005_hello'])
-    si = MigrationState(migration_db=db, dev=False)
-
-    self.set_schema_version(1)
-    self.assert_equal(["001_foo"], si.list_of_old_migrations_applied())
-    self.set_schema_version(2)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(3)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(4)
-    self.assert_equal(["001_foo", "002_bar"], si.list_of_old_migrations_applied())
-    self.set_schema_version(5)
-    self.assert_equal(["001_foo", "002_bar", "005_hello"], si.list_of_old_migrations_applied())
-    self.set_schema_version(6)
-    self.assert_equal(["001_foo", "002_bar", "005_hello"], si.list_of_old_migrations_applied())
 
   def test_init_on_fresh_db_creates_new_table(self):
     si = MigrationState()
 
-    self.assert_equal(False, si.old_migration_table_present())
     self.assert_equal(False, si.new_migration_table_present())
 
     si.init()
 
-    self.assert_equal(False, si.old_migration_table_present())
     self.assert_equal(True, si.new_migration_table_present())
 
   def test_init_on_initialized_db_does_nothing(self):
@@ -132,12 +41,10 @@ class MigrationStateTest(TestCase):
 
     si = MigrationState()
 
-    self.assert_equal(False, si.old_migration_table_present())
     self.assert_equal(True, si.new_migration_table_present())
 
     si.init()
 
-    self.assert_equal(False, si.old_migration_table_present())
     self.assert_equal(True, si.new_migration_table_present())
 
   def test_applying_and_unapplying(self):
@@ -166,91 +73,6 @@ class MigrationStateTest(TestCase):
 
     si.mark_as_applied('002_bar')
     assert_applied(True, True, False)
-
-  def test_init_on_old_db_migrates_dev(self):
-    self.cursor.execute(create_old)
-    self.set_schema_version(4)
-
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '003_DEV_kitty', '005_hello'])
-    si = MigrationState(migration_db=db, dev=True)
-
-    self.assert_equal(True, si.old_migration_table_present())
-    self.assert_equal(False, si.new_migration_table_present())
-
-    si.init()
-
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
-
-    self.assert_equal(True, si.is_applied('001_foo'))
-    self.assert_equal(True, si.is_applied('002_bar'))
-    self.assert_equal(True, si.is_applied('003_DEV_kitty'))
-    self.assert_equal(False, si.is_applied('005_hello'))
-
-  def test_init_on_old_db_migrates_nodev(self):
-    self.cursor.execute(create_old)
-    self.set_schema_version(4)
-
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '003_DEV_kitty', '005_hello'])
-    si = MigrationState(migration_db=db, dev=False)
-
-    self.assert_equal(True, si.old_migration_table_present())
-    self.assert_equal(False, si.new_migration_table_present())
-
-    si.init()
-
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
-
-    self.assert_equal(True, si.is_applied('001_foo'))
-    self.assert_equal(True, si.is_applied('002_bar'))
-    self.assert_equal(False, si.is_applied('003_DEV_kitty'))
-    self.assert_equal(False, si.is_applied('005_hello'))
-
-  def test_old_schema_version(self):
-    self.cursor.execute(create_old)
-    si = MigrationState()
-    
-    self.assert_equal(0, si.get_old_schema_version())
-    self.set_schema_version(4)
-    self.assert_equal(4, si.get_old_schema_version())
-    self.set_schema_version(17)
-    self.assert_equal(17, si.get_old_schema_version())
-    self.set_schema_version(7)
-    self.assert_equal(7, si.get_old_schema_version())
-   
-
-  def test_that_db_init_requires_explicit_dev_flag_if_it_would_affect_the_results(self):
-    self.cursor.execute(create_old)
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '003_DEV_kitty', '005_hello'])
-
-    self.set_schema_version(4)
-    si = MigrationState(migration_db=db)
-    self.assert_raises(Exception, lambda: si.list_of_old_migrations_applied())
-
-    si = MigrationState(migration_db=db, dev=True)
-    self.assert_equal(['001_foo', '002_bar', '003_DEV_kitty'], si.list_of_old_migrations_applied())
-    si = MigrationState(migration_db=db, dev=False)
-    self.assert_equal(['001_foo', '002_bar'], si.list_of_old_migrations_applied())
-
-    self.set_schema_version(2)
-    si = MigrationState(migration_db=db)
-    self.assert_equal(['001_foo', '002_bar'], si.list_of_old_migrations_applied())
-    si = MigrationState(migration_db=db, dev=True)
-    self.assert_equal(['001_foo', '002_bar'], si.list_of_old_migrations_applied())
-    si = MigrationState(migration_db=db, dev=False)
-    self.assert_equal(['001_foo', '002_bar'], si.list_of_old_migrations_applied())
-
-  def test_db_init_handles_dups_correctly(self):
-    self.cursor.execute(create_old)
-    db = MigrationDb(migrations = ['001_foo', '002_bar', '005_omg', '005_hello'])
-    si = MigrationState(migration_db=db)
-
-    self.set_schema_version(5)
-    self.assert_raises(Exception, lambda: si.list_of_old_migrations_applied())
-
-    self.set_schema_version(4)
-    self.assert_equal(['001_foo', '002_bar'], si.list_of_old_migrations_applied())
 
   def assert_plans(self, si, *plans):
     while plans:
@@ -465,53 +287,6 @@ class MigrationStateTest(TestCase):
       ['down'],      [('002_DEV_bar', 'down')],
     )
 
-  def test_uninit_requires_dev(self):
-    db = MigrationDb(migrations = ['001_foo', '002_DEV_bar', '005_omg', '006_DEV_hello'])
-    si = MigrationState(migration_db=db)
-    si.init()
-
-    si.mark_as_applied('001_foo')
-    si.mark_as_applied('002_DEV_bar')
-
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
-
-    self.assert_raises(DevFlagRequiredError, lambda: si.uninit())
-
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
-
-  def test_uninit(self):
-    db = MigrationDb(migrations = ['001_foo', '002_DEV_bar', '005_omg', '006_DEV_hello'])
-    si = MigrationState(migration_db=db, dev=True)
-    si.init()
-
-    si.mark_as_applied('001_foo')
-    si.mark_as_applied('002_DEV_bar')
-
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
-
-    si.uninit()
-
-    self.assert_equal(True, si.old_migration_table_present())
-    self.assert_equal(False, si.new_migration_table_present())
-
-    self.assert_equal(2, si.get_old_schema_version())
-
-  def test_uninit_inconsistent(self):
-    db = MigrationDb(migrations = ['001_foo', '002_DEV_bar', '005_omg', '006_DEV_hello'])
-    si = MigrationState(migration_db=db, dev=True)
-    si.init()
-
-    si.mark_as_applied('001_foo')
-    si.mark_as_applied('005_omg')
-
-    self.assert_equal(False, si.old_migration_table_present())
-    self.assert_equal(True, si.new_migration_table_present())
-
-    self.assert_raises(InconsistentStateError, lambda: si.uninit())
-  
   def test_all_migrations_applied(self):
     db = MigrationDb(migrations = ['001_foo', '002_DEV_bar', '005_omg', '006_DEV_hello'])
     si = MigrationState(migration_db=db)

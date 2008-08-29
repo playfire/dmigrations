@@ -1,5 +1,5 @@
-from gcap.apps.dmigrations.tests.common import *
-from gcap.apps.dmigrations.migration_loader import *
+from dmigrations.tests.common import *
+from dmigrations.migration_loader import *
 import os
 import os.path
 

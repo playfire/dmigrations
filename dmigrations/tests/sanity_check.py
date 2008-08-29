@@ -1,5 +1,5 @@
-from gcap.apps.dmigrations.tests.common import *
-from gcap.apps.dmigrations.sanity_check import zip_sets, get_tables_existence_status
+from dmigrations.tests.common import *
+from dmigrations.sanity_check import zip_sets, get_tables_existence_status
 
 class SanityCheckTest(TestCase):
   def test_zip_sets(self):
