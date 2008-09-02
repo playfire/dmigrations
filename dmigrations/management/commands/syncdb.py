@@ -1,14 +1,17 @@
+from django.core.management.commands.syncdb import Command as Original
 import sys
-from optparse import make_option
-from django.core.management.base import NoArgsCommand
-from django.contrib.auth.management import create_permissions
 
-class Command(NoArgsCommand):
+class Command(Original):
     """
-    Over-ride syncdb - people should not be using it if they are managing 
-    their database with dmigrations instead.
+    Our own version of syncdb that obeys the DISABLE_SYNCDB setting.
     """
     def handle_noargs(self, **options):
-        raise Exception(
-            "Use migrations not syncdb - ./manage.py help dmigrate for help"
-        )
+        from django.conf import settings
+        if getattr(settings, 'DISABLE_SYNCDB', False):
+            sys.stderr.write(
+                'Use dmigrations, not syncdb - "%s help dmigrate" for help\n' 
+                % sys.argv[0]
+            )
+            sys.exit(1)
+        else:
+            super(Command, self).handle_noargs(**options)
