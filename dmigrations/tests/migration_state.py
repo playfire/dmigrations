@@ -21,31 +21,31 @@ class MigrationStateTest(TestCase):
   def test_table_present_methods(self):
     si = MigrationState()
 
-    self.assert_equal(False, si.new_migration_table_present())
+    self.assert_equal(False, si.migration_table_present())
 
     self.cursor.execute(create_new)
 
-    self.assert_equal(True, si.new_migration_table_present())
+    self.assert_equal(True, si.migration_table_present())
 
   def test_init_on_fresh_db_creates_new_table(self):
     si = MigrationState()
 
-    self.assert_equal(False, si.new_migration_table_present())
+    self.assert_equal(False, si.migration_table_present())
 
     si.init()
 
-    self.assert_equal(True, si.new_migration_table_present())
+    self.assert_equal(True, si.migration_table_present())
 
   def test_init_on_initialized_db_does_nothing(self):
     self.cursor.execute(create_new)
 
     si = MigrationState()
 
-    self.assert_equal(True, si.new_migration_table_present())
+    self.assert_equal(True, si.migration_table_present())
 
     si.init()
 
-    self.assert_equal(True, si.new_migration_table_present())
+    self.assert_equal(True, si.migration_table_present())
 
   def test_applying_and_unapplying(self):
     def assert_applied(f, b, h):

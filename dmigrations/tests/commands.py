@@ -4,46 +4,51 @@ import sys
 from StringIO import StringIO
 
 class CommandsTest(TestCase):
-  def set_up(self):
-    self.stdout = sys.stdout
-
-  def tear_down(self):
-    sys.stdout = self.stdout
-
-  def test_that_syncdb_raises_exception(self):
-    try:
-      call_command('syncdb')
-    except Exception, e:
-      self.assert_equal("Use migrations not syncdb - ./manage.py help dmigrate for help", str(e))
-    else:
-      self.assert_("Exception should be raised by syncdb")
-
-  def test_that_fix_permissions_doesnt_break(self):
-    # NOTE: Very basic test, it could as well do nothing and pass
-    call_command('fix_permissions')
-
-  def pipe_command(self, *args, **kwargs):
-    sys.stdout = StringIO()
-    call_command(*args, **kwargs)
-    res = sys.stdout.getvalue()
-    sys.stdout = self.stdout
-    return res
-
-  def test_migration(self):
-    try:
-      import gcap.apps.london_guide.models
-    except ImportError, e:
-      # NOTE: Disable on asset-manager branch
-      return
+    def set_up(self):
+        self.stdout = sys.stdout
     
-    actual = self.pipe_command('migration', "addcolumn", "london_guide", "venue", "company", output=True)
-    expected = """from gcap.apps.dmigrations import migrations as m\nimport datetime\n
-migration = m.AddColumn('london_guide', 'venue', 'company', 'varchar(256) NOT NULL')\n\n"""
-    self.assert_equal(expected, actual)
-
-
-    actual = self.pipe_command('migration', "new", "something", output=True)
-    expected = """from gcap.apps.dmigrations import migrations as m
+    def tear_down(self):
+        sys.stdout = self.stdout
+    
+    def test_that_syncdb_raises_exception_based_on_setting(self):
+        from django.conf import settings
+        old_setting = getattr(settings, 'DISABLE_SYNCDB', False)
+        
+        settings.DISABLE_SYNCDB = True
+        self.assertRaises(SystemExit, call_command, 'syncdb')
+        
+        settings.DISABLE_SYNCDB = False
+        self.assert_(not self.pipe_command('syncdb'))
+        
+        settings.DISABLE_SYNCDB = old_setting
+    
+    def pipe_command(self, *args, **kwargs):
+        sys.stdout = StringIO()
+        call_command(*args, **kwargs)
+        res = sys.stdout.getvalue()
+        sys.stdout = self.stdout
+        return res
+    
+    def test_dmigration(self):
+        from django.conf import settings
+        if 'django.contrib.sessions' not in settings.INSTALLED_APPS:
+            print "WARNING: Skipping ./manage.py dmigration tests, " \
+                "add django.contrib.sessions to INSTALLED_APPS to run them"
+            return
+        
+        # ./manage.py dmigration addcolumn sessions session session_key
+        actual = self.pipe_command(
+            'dmigration', "addcolumn", "sessions", "session", "session_key",
+            output=True
+        )
+        expected = """from dmigrations.mysql import migrations as m\nimport datetime\nmigration = m.AddColumn('sessions', 'session', 'session_key', 'varchar(40) NOT NULL PRIMARY KEY')\n\n"""
+        self.assert_equal(expected, actual)
+        
+        # ./manage.py dmigration migration new something
+        actual = self.pipe_command(
+            'dmigration', "new", "something", output=True
+        )
+        expected = """from dmigrations.mysql import migrations as m
 
 class CustomMigration(m.Migration):
     def __init__(self):
@@ -51,15 +56,25 @@ class CustomMigration(m.Migration):
         sql_down = []
         super(MyMigration, self).__init__(sql_up=sql_up, sql_down=sql_down)
     # Or override the up() and down() methods\n\nmigration = CustomMigration()\n\n"""
-    self.assert_equal(expected, actual)
-
-    actual = self.pipe_command('migration', "addindex", "london_guide", "venue", "company", output=True)
-    expected = """from gcap.apps.dmigrations import migrations as m\nimport datetime\n\nmigration = m.AddIndex('london_guide', 'venue', 'company')\n\n"""
-    self.assert_equal(expected, actual)
-
-    # Simply check they don't raise an exception
-    actual = self.pipe_command('migration', "app", "london_guide", output=True)
-
-    actual = self.pipe_command('migration', "addtable", "london_guide", "venue", output=True)
-
-    actual = self.pipe_command('migration', "insert", "articles", "article", output=True)
+        self.assert_equal(expected, actual)
+        
+        # ./manage.py dmigration addindex sessions session expire_date
+        actual = self.pipe_command(
+            'dmigration', "addindex", "sessions", "session", "expire_date", 
+            output=True
+        )
+        expected = """from dmigrations.mysql import migrations as m\nimport datetime\nmigration = m.AddIndex('sessions', 'session', 'expire_date')\n\n"""
+        self.assert_equal(expected, actual)
+        
+        # Simply check they don't raise an exception
+        actual = self.pipe_command(
+            'dmigration', "app", "sessions", output=True
+        )
+        
+        actual = self.pipe_command(
+            'dmigration', "addtable", "sessions", "session", output=True
+        )
+        
+        #actual = self.pipe_command(
+        #    'dmigration', "insert", "sessions", "session", output=True
+        #)

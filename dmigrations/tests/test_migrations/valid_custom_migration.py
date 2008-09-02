@@ -1,4 +1,4 @@
-from gcap.apps.dmigrations.migrations import Migration
+from dmigrations.mysql.migrations import Migration
 
 class MyCrazyMigration(Migration):
     pass
