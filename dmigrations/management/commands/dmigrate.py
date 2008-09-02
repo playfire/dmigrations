@@ -7,7 +7,6 @@ from StringIO import StringIO
 from dmigrations.migration_state import MigrationState, table_present
 from dmigrations.migration_db import MigrationDb
 from dmigrations.exceptions import *
-from dmigrations.sanity_check import sanity_check
 
 class Command(BaseCommand):
     help = """Commands:
@@ -121,15 +120,11 @@ class Command(BaseCommand):
                 ).read()
             return
         
-        elif args[0] == 'sanity_check':
-            sanity_check()
-            return
-        
         else:
             raise CommandError(
                 'Argument should be one of: list, help, up, down, all, init, '
                 'apply, unapply, to, downto, upto, mark_as_applied, '
-                'mark_as_unapplied, sanity_check'
+                'mark_as_unapplied'
             )
         
         # Ensure Django permissions and content_types have been created
