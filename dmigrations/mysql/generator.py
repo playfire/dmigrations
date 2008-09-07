@@ -381,7 +381,9 @@ class CustomMigration(m.Migration):
     def __init__(self):
         sql_up = []
         sql_down = []
-        super(MyMigration, self).__init__(sql_up=sql_up, sql_down=sql_down)
+        super(CustomMigration, self).__init__(
+            sql_up=sql_up, sql_down=sql_down
+        )
     # Or override the up() and down() methods
 
 migration = CustomMigration()
