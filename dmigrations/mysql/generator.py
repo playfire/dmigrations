@@ -9,7 +9,7 @@ from django.db import models
 from django.conf import settings
 from dmigrations.generator_utils import save_migration
 
-import re
+import re, sys, pprint
 
 def get_commands():
     return {
