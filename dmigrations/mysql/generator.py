@@ -134,7 +134,10 @@ def add_column(args, output):
     
     app_label, model, columns = args[0], args[1], args[2:]
     actual_model = models.get_model(app_label, model)
-    
+    table_name = actual_model._meta.db_table
+    if table_name.startswith(app_label+'_'):
+        table_name = table_name[len(app_label)+1:]
+
     style = no_style()
     sql, references = connection.creation.sql_create_model(
         actual_model, style, set()
@@ -152,7 +155,7 @@ def add_column(args, output):
         ))
          
     migration_defs = [
-        add_column_mtemplate % (app_label, model, column, col_spec)
+        add_column_mtemplate % (app_label, table_name, column, col_spec)
         for (column, col_spec, is_foreign_key) in col_specs 
         if not is_foreign_key
     ]
