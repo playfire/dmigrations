@@ -26,6 +26,8 @@ class Command(BaseCommand):
         try:
             db_generator = __import__(import_path, {}, {}, [''])
         except ImportError, e:
+            if settings.DATABASE_ENGINE == 'dummy':
+                print "You need to specify a DATABASE_ENGINE in your settings"
             raise # Just let them see the error
         
         available_args = db_generator.get_commands()
