@@ -6,19 +6,21 @@ from StringIO import StringIO
 class CommandsTest(TestCase):
     def set_up(self):
         self.stdout = sys.stdout
+        self.stderr = sys.stderr
     
     def tear_down(self):
         sys.stdout = self.stdout
+        sys.stderr = self.stderr
     
     def test_that_syncdb_raises_exception_based_on_setting(self):
         from django.conf import settings
         old_setting = getattr(settings, 'DISABLE_SYNCDB', False)
         
         settings.DISABLE_SYNCDB = True
-        self.assertRaises(SystemExit, call_command, 'syncdb')
+        self.assertRaises(SystemExit, self.pipe_err_command, 'syncdb')
         
         settings.DISABLE_SYNCDB = False
-        self.assert_(not self.pipe_command('syncdb'))
+        self.assert_(not self.pipe_err_command('syncdb'))
         
         settings.DISABLE_SYNCDB = old_setting
     
@@ -26,6 +28,15 @@ class CommandsTest(TestCase):
         sys.stdout = StringIO()
         call_command(*args, **kwargs)
         res = sys.stdout.getvalue()
+        sys.stdout = self.stdout
+        return res
+
+    def pipe_err_command(self, *args, **kwargs):
+        sys.stderr = StringIO()
+        sys.stdout = StringIO()
+        call_command(*args, **kwargs)
+        res = sys.stderr.getvalue()
+        sys.stderr = self.stderr
         sys.stdout = self.stdout
         return res
     
