@@ -10,25 +10,25 @@ from dmigrations.exceptions import *
 
 class Command(BaseCommand):
     help = """Commands:
-./manage.py dmigrate apply M1 M1 - Apply specified migrations
-./manage.py dmigrate unapply M1 M2 - Unapply specified migration
-./manage.py dmigrate mark_as_applied M1 M2 - Mark specified migrations as applied without running them
-./manage.py dmigrate mark_as_unapplied M1 M2 - Unapply specified migration as unapplied without running them
-./manage.py dmigrate cat M1 M2 - Print specified migrations
+%(name)s dmigrate apply M1 M1 - Apply specified migrations
+%(name)s dmigrate unapply M1 M2 - Unapply specified migration
+%(name)s dmigrate mark_as_applied M1 M2 - Mark specified migrations as applied without running them
+%(name)s dmigrate mark_as_unapplied M1 M2 - Unapply specified migration as unapplied without running them
+%(name)s dmigrate cat M1 M2 - Print specified migrations
 
-./manage.py dmigrate all      - Run all migrations
-./manage.py dmigrate up       - Apply oldest unapplied migration
-./manage.py dmigrate down     - Unapply newest applied migration
+%(name)s dmigrate all      - Run all migrations
+%(name)s dmigrate up       - Apply oldest unapplied migration
+%(name)s dmigrate down     - Unapply newest applied migration
 
-./manage.py dmigrate to M     - Apply all migrations up to M, upapply all migrations newer than M
-./manage.py dmigrate upto M   - Apply all migrations up to M
-./manage.py dmigrate downto M - Upapply all migrations newer than M
+%(name)s dmigrate to M     - Apply all migrations up to M, upapply all migrations newer than M
+%(name)s dmigrate upto M   - Apply all migrations up to M
+%(name)s dmigrate downto M - Upapply all migrations newer than M
 
-./manage.py dmigrate init     - Ensure migration system is initialized
+%(name)s dmigrate init     - Ensure migration system is initialized
 
-./manage.py dmigrate list     - List all migrations and their state
-./manage.py dmigrate help     - Display this message
-"""
+%(name)s dmigrate list     - List all migrations and their state
+%(name)s dmigrate help     - Display this message
+""" % {'name': sys.argv[0]}
     args = '[command] [arguments]'
     option_list = BaseCommand.option_list + (
         # NOTE: dev has three values, True, False, and None
@@ -57,8 +57,7 @@ class Command(BaseCommand):
         verbosity = int(options.get('verbosity', 1))
         
         if not args or args[0] == 'help':
-            # TODO: Do this without calling os.system
-            os.system('./manage.py help dmigrate')
+            self.print_help(sys.argv[0], 'dmigrate')
             return
         
         elif args[0] in 'all up down upto downto to apply unapply'.split():
