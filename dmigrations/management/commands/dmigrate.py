@@ -41,9 +41,6 @@ class Command(BaseCommand):
             help='Exclude development migrations (DEV in the filename)'),
         make_option('--print-plan', action='store_true', dest='print_plan',
             help='Only print plan'),
-        make_option('--verbosity', action='store', dest='verbosity',
-            default='1', type='choice', choices=['0', '1', '2'],
-            help='Verbosity level; 0=minimal, 1=normal output, 2=all output'),
     )
     requires_model_validation = False
     
