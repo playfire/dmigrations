@@ -135,6 +135,11 @@ def add_column(args, output):
     app_label, model, columns = args[0], args[1], args[2:]
     actual_model = models.get_model(app_label, model)
     table_name = actual_model._meta.db_table
+    if actual_model is None:
+        raise CommandError(
+             'No such model %r, or it is not a concrete model.' % model
+        )
+
     if table_name.startswith(app_label+'_'):
         table_name = table_name[len(app_label)+1:]
 
