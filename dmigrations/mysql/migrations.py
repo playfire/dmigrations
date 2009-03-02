@@ -30,16 +30,16 @@ class Migration(BaseMigration):
     
     def execute_sql(self, sql, return_rows=False):
         "Executes sql, which can be a string or a list of strings"        
-        statements = []
         if isinstance(sql, basestring):
             # Split string in to multiple statements
             statements_re = re.compile(r";[ \t]*$", re.M)
             statements = [s for s in statements_re.split(sql) if s.strip()]
-        elif isinstance(sql, (list, tuple)):
-            # Assume each item in the list is already an individual statement
-            statements = sql
         else:
-            assert False, 'sql argument must be string or list/tuple'
+            try:
+                # Assume each item in the iterable is already an individual statement
+                statements = iter(sql):
+            except TypeError:
+                assert False, 'sql argument must be string or iterable'
         
         from django.db import connection
         cursor = connection.cursor()
@@ -82,6 +82,7 @@ class AddColumn(Migration):
     constrain_to_table_down_sql = 'ALTER TABLE `%s_%s` DROP FOREIGN KEY `%s`;'
     
     def __init__(self, app, model, column, spec, constrain_to_table=None):
+        model = model.lower()
         self.app, self.model, self.column, self.spec = app, model, column, spec
         if constrain_to_table:
             # this can only be used for ForeignKeys that link to another table's
@@ -138,6 +139,7 @@ class AddIndex(Migration):
     drop_index_sql = 'ALTER TABLE %s_%s DROP INDEX `%s`;'
     
     def __init__(self, app, model, column):
+        model = model.lower()
         self.app, self.model, self.column = app, model, column
         index_name = '%s_%s_%s' % (app, model, column)
         super(AddIndex, self).__init__(

@@ -44,7 +44,7 @@ class Command(BaseCommand):
             # Print instructions
             print "Use this tool to generate migrations"
             for arg, fn in available_args.items():
-                print "  ./manage.py migration %s%s" % (arg, fn.__doc__)
+                print "  ./manage.py dmigration %s%s" % (arg, fn.__doc__)
             print "  Use the --output option to view a migration without " \
                 "writing it to disk"
 

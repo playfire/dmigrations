@@ -199,9 +199,9 @@ def add_new(args, output):
         raise CommandError('./manage.py migration new <description>')
     
     db_engine = getattr(settings, 'DMIGRATIONS_DATABASE_BACKEND', 'mysql')
-    
+    description = '_'.join(args).lower().replace('.', '_')
     save_migration(
-        output, skeleton_template % db_engine, '_'.join(args).lower()
+        output, skeleton_template % db_engine, description
     )
 
 def add_insert(args, output):
