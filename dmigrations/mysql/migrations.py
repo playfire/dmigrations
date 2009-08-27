@@ -37,7 +37,7 @@ class Migration(BaseMigration):
         else:
             try:
                 # Assume each item in the iterable is already an individual statement
-                statements = iter(sql):
+                statements = iter(sql)
             except TypeError:
                 assert False, 'sql argument must be string or iterable'
         
