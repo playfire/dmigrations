@@ -163,12 +163,20 @@ class AddIndex(Migration):
     add_index_sql = 'CREATE INDEX `%s` ON `%s_%s` (`%s`);'
     drop_index_sql = 'ALTER TABLE %s_%s DROP INDEX `%s`;'
     
-    def __init__(self, app, model, column):
+    def __init__(self, app, model, column, name=None):
         model = model.lower()
-        self.app, self.model, self.column = app, model, column
-        index_name = '%s_%s_%s' % (app, model, column)
+        self.app, self.model = app, model
+        if isinstance(column, basestring):
+            self.columns = [column]
+        else:
+            self.columns = column
+        if name:
+            index_name = name
+        else:
+            index_name = '%s_%s_%s' % (app, model, '_'.join(self.columns))
         super(AddIndex, self).__init__(
-            sql_up = [self.add_index_sql % (index_name, app, model, column)],
+            sql_up = [self.add_index_sql % (index_name, app, model,
+                                            ', '.join('`%s`' % c for c in self.columns))],
             sql_down = [self.drop_index_sql % (app, model, index_name)],
         )
     
