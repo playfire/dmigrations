@@ -101,14 +101,16 @@ class Compound(BaseMigration):
 class AddColumn(Migration):
     "A migration that adds a database column"
     
-    add_column_sql = 'ALTER TABLE `%s_%s` ADD COLUMN `%s` %s;'
-    drop_column_sql = 'ALTER TABLE `%s_%s` DROP COLUMN `%s`;'
-    constrain_to_table_sql = 'ALTER TABLE `%s_%s` ADD CONSTRAINT %s FOREIGN KEY (`%s`) REFERENCES `%s` (`id`);'
-    constrain_to_table_down_sql = 'ALTER TABLE `%s_%s` DROP FOREIGN KEY `%s`;'
+    add_column_sql = 'ALTER TABLE `%(table)s` ADD COLUMN `%(colname)s` %(spec)s;'
+    drop_column_sql = 'ALTER TABLE `%(table)s` DROP COLUMN `%(colname)s`;'
+    constrain_to_table_sql = 'ALTER TABLE `%(table)s` ADD CONSTRAINT %(constraint)s' \
+        ' FOREIGN KEY (`%(colname)s`) REFERENCES `%(constraint_table)s` (`id`)%(ondelete)s;'
+    constrain_to_table_down_sql = 'ALTER TABLE `%(table)s` DROP FOREIGN KEY `%(constraint)s`;'
     
-    def __init__(self, app, model, column, spec, constrain_to_table=None):
+    def __init__(self, app, model, column, spec, constrain_to_table=None, ondelete=''):
         model = model.lower()
         self.app, self.model, self.column, self.spec = app, model, column, spec
+        table = '%s_%s' % (app.lower(), model)
         if constrain_to_table:
             # this can only be used for ForeignKeys that link to another table's
             # id field. It is not for arbitrary relationships across tables!
@@ -121,18 +123,36 @@ class AddColumn(Migration):
             
             # add the FK constraint
             constraint_name = "%s_refs_id_%x" % (column, abs(hash((model,constrain_to_table))))
-            sql_up = [self.constrain_to_table_sql % (app, model, constraint_name, "%s_id" % column, constrain_to_table)]
-            
-            sql_up.insert(0,self.add_column_sql % (app, model, "%s_id" % column, spec))
-            sql_down = [self.drop_column_sql % (app, model, "%s_id" % column)]
+
+            args = {
+                'table': table,
+                'colname': '%s_id' % column,
+                'spec': spec,
+                'constraint': constraint_name,
+                'constraint_table': constrain_to_table,
+                'ondelete': ' ON DELETE %s' % ondelete if ondelete else '',
+            }
+
+            sql_up = [
+                self.add_column_sql % args,
+                self.constrain_to_table_sql % args,
+            ]
+
+            sql_down = [
+                self.constrain_to_table_down_sql % args,
+                self.drop_column_sql % args,
+            ]
+
             # if add_column_sql has NOT NULL in it, bin it
             sql_up[0] = sql_up[0].replace(" NOT NULL", "")
-            # drop FK on sql_down
-            sql_down.insert(0,self.constrain_to_table_down_sql % (app, model, constraint_name))
-            
         else:
-            sql_up = [self.add_column_sql % (app, model, column, spec)]
-            sql_down = [self.drop_column_sql % (app, model, column)]
+            args = {
+                'table': table,
+                'colname': column,
+                'spec': spec,
+            }
+            sql_up = [self.add_column_sql % args]
+            sql_down = [self.drop_column_sql % args]
             
         super(AddColumn, self).__init__(
             sql_up,
