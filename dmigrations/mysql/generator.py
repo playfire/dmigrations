@@ -17,6 +17,7 @@ def get_commands():
         'addindex': add_index,
         'addcolumn': add_column,
         'addtable': add_table,
+        'renametable': rename_table,
         'new': add_new,
         'insert': add_insert,
     }
@@ -257,6 +258,20 @@ def add_insert(args, output):
     
     save_migration(output, migration_output, 'insert_into_%s_%s' % (
         app_label, model
+    ))
+
+def rename_table(args, output):
+    " <oldname> <newname>: Rename table"
+    if len(args) != 2:
+        raise CommandError('./manage.py dmigration renametable <oldname> <newname>')
+
+    oldname, newname = args
+
+    migration_output = 'm.RenameTable(%r, %r)' % (oldname, newname)
+    migration_output = migration_code(migration_output)
+
+    save_migration(output, migration_output, 'rename_table_%s_%s' % (
+        oldname, newname
     ))
 
 def sql_delete(app, style):

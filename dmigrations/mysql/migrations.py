@@ -233,3 +233,18 @@ class InsertRows(Migration):
             sql_up = ["BEGIN"] + sql_up + ["COMMIT"],
             sql_down = ["BEGIN"] + sql_down + ["COMMIT"],
         )
+
+class RenameTable(Migration):
+    def __init__(self, oldname, newname):
+        self.oldname = oldname
+        self.newname = newname
+
+        sql_up  = 'RENAME TABLE `%s` TO `%s`' % (oldname, newname)
+        sql_down = 'RENAME TABLE `%s` TO `%s`' % (newname, oldname)
+
+        super(RenameTable, self).__init__(
+            sql_up=sql_up, sql_down=sql_down
+        )
+
+    def __repr__(self):
+        return 'RenameTable(%s, %s)' % (self.oldname, self.newname)
