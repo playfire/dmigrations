@@ -8,6 +8,9 @@ or removing an index.
 """
 from dmigrations.migrations import BaseMigration
 import re
+import sys
+
+from django.utils import termcolors
 
 class IrreversibleMigrationError(Exception):
     pass
@@ -61,13 +64,35 @@ class Compound(BaseMigration):
     def __init__(self, migrations=[]):
         self.migrations = migrations
     
+    def run(self, direction, migs):
+        successful = []
+        try:
+            for migration in migs:
+                getattr(migration, direction)()
+                successful.append(migration)
+        except:
+            rollback_dir = {
+                'up': 'down',
+                'down': 'up',
+            }[direction]
+
+            print >>sys.stderr, termcolors.colorize(
+                'Got exception, rolling back %d successful migrations' % len(successful),
+                fg='red'
+            )
+
+            for migration in reversed(successful):
+                try:
+                    getattr(migration, rollback_dir)()
+                except Exception, e:
+                    print e
+            raise
+
     def up(self):
-        for migration in self.migrations:
-            migration.up()
-    
+        self.run('up', self.migrations)
+
     def down(self):
-        for migration in reversed(self.migrations):
-            migration.down()
+        self.run('down', reversed(self.migrations))
 
     def __str__(self):
         return 'Compound Migration: %s' % self.migrations
