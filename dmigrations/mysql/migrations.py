@@ -248,3 +248,90 @@ class RenameTable(Migration):
 
     def __repr__(self):
         return 'RenameTable(%s, %s)' % (self.oldname, self.newname)
+
+class ChangeColumn(Migration):
+    def __init__(self, table, oldname, newname=None, old_def=None, new_def=None):
+        self.table = table
+        self.oldname = oldname
+        self.newname = newname
+        # if no definition is given, try a simple rename
+        self.old_def = old_def
+        self.new_def = new_def
+
+        assert (new_def and old_def) or (not new_def and not old_def), \
+            'if you specify a new or old definition, you must specify both'
+
+    class AlreadyDone(Exception):
+        pass
+
+    class Failure(Exception):
+        pass
+
+    class Conflict(Exception):
+        pass
+
+    def introspect_sql(self, from_name, to_name, to_definition):
+        from django.db import connection
+        cursor = connection.cursor()
+
+        cursor.execute('DESC `%s`' % self.table)
+        defs = list(cursor.fetchall())
+
+        old_def, new_def = None, None
+
+        for d in defs:
+            if d[0] == from_name:
+                old_def = d
+            elif d[0] == to_name:
+                new_def = d
+
+        if new_def and not old_def:
+            if to_definition and to_name:
+                raise self.Failure('Cannot perform migration as column `%s` already exists.' % to_name)
+            else:
+                raise self.AlreadyDone()
+        elif new_def and old_def:
+            raise self.Conflict('Cannot perform migration as column `%s` already exists.' % to_name)
+        elif not old_def:
+            raise self.Failure('Cannot perform migration as column `%s` does not exist.' % from_name)
+
+        coltype, null, key, default, extra = old_def[1:]
+        if key.upper() == 'PRI':
+            raise self.Failure("I can't deal with primary keys! Aaargh! (`%s.%s`)" % (self.table, from_name))
+        if extra:
+            raise self.Failure("I can't deal with special column types! Aaargh! (`%s.%s` is %s)"
+                               % (self.table, from_name, extra))
+
+        if to_definition:
+            newdef = to_definition
+        else:
+            nullclause = 'NOT NULL' if null.upper() == 'NO' else 'NULL';
+            newdef = '%s %s' % (coltype, nullclause)
+
+        return self.change_sql(from_name, to_name, newdef)
+
+    def change_sql(self, from_name, to_name, to_def):
+        return 'ALTAER TABLE `%s` CHANGE `%s` `%s` %s' % (
+            self.table,
+            from_name,
+            to_name,
+            to_def,
+            )
+
+    def up(self):
+        try:
+            sql = self.introspect_sql(self.oldname, self.newname or self.oldname, self.new_def)
+        except self.AlreadyDone, e:
+            print e
+            return
+
+        self.execute_sql(sql)
+
+    def down(self):
+        try:
+            sql = self.introspect_sql(self.newname or self.oldname, self.oldname, self.old_def)
+        except self.AlreadyDone, e:
+            print e
+            return
+
+        self.execute_sql(sql)
