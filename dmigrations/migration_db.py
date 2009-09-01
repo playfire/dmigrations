@@ -104,6 +104,12 @@ class MigrationDb(object):
         """
         return bool(re.search(r'_DEV_', name))
     
+    def is_soft_migration(self, name):
+        """
+        Migration is a SOFT migration if it has string "_SOFT_" in its name.
+        """
+        return bool(re.search(r'_SOFT_', name))
+
     def find_unique_migration_by_number(self, number):
         matching_migrations = [
             name for name in self.migrations 

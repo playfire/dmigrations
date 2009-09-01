@@ -182,8 +182,11 @@ class MigrationState(object):
     def unapplied_only(self, migrations):
         return [m for m in migrations if not self.is_applied(m)]
     
+    def hard_only(self, migrations):
+        return [m for m in migrations if not self.migration_db.is_soft_migration(m)]
+
     def plan(self, action, *args):
-        if action in ['all', 'up', 'down'] and len(args) > 0:
+        if action in ['all', 'all_hard', 'up', 'down'] and len(args) > 0:
             raise Exception(u"Too many arguments")
         
         if action in ['upto', 'downto', 'to'] and len(args) != 1:
@@ -202,6 +205,9 @@ class MigrationState(object):
         if action == 'all':
             return _up(self.unapplied_only(self.list_considering_dev()))
         
+        if action == 'all_hard':
+            return _up(self.unapplied_only(self.hard_only(self.list_considering_dev())))
+
         if action == 'up':
             return _up(self.unapplied_only(self.list_considering_dev()))[:1]
         

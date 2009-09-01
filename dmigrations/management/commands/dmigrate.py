@@ -17,6 +17,7 @@ class Command(BaseCommand):
 %(name)s dmigrate cat M1 M2 - Print specified migrations
 
 %(name)s dmigrate all      - Run all migrations
+%(name)s dmigrate all_hard - Run all hard migrations (those that require the site to be down)
 %(name)s dmigrate up       - Apply oldest unapplied migration
 %(name)s dmigrate down     - Unapply newest applied migration
 
@@ -60,7 +61,7 @@ class Command(BaseCommand):
             self.print_help(sys.argv[0], 'dmigrate')
             return
         
-        elif args[0] in 'all up down upto downto to apply unapply'.split():
+        elif args[0] in 'all all_hard up down upto downto to apply unapply'.split():
             migration_state.init()
             for (migration_name, action) in migration_state.plan(*args):
                 migration = migration_db.load_migration_object(migration_name)
@@ -118,7 +119,7 @@ class Command(BaseCommand):
         
         else:
             raise CommandError(
-                'Argument should be one of: list, help, up, down, all, init, '
+                'Argument should be one of: list, help, up, down, all, all_hard, init, '
                 'apply, unapply, to, downto, upto, mark_as_applied, '
                 'mark_as_unapplied'
             )
