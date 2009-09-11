@@ -331,7 +331,7 @@ class ChangeColumn(Migration):
         return self.change_sql(from_name, to_name, newdef)
 
     def change_sql(self, from_name, to_name, to_def):
-        return 'ALTAER TABLE `%s` CHANGE `%s` `%s` %s' % (
+        return 'ALTER TABLE `%s` CHANGE `%s` `%s` %s' % (
             self.table,
             from_name,
             to_name,
