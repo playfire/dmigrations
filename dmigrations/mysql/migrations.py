@@ -180,7 +180,7 @@ class DropColumn(AddColumn):
 class AddIndex(Migration):
     "A migration that adds an index (and removes it on down())"
     
-    add_index_sql = 'CREATE INDEX `%s` ON `%s_%s` (`%s`);'
+    add_index_sql = 'CREATE INDEX `%s` ON `%s_%s` (%s);'
     drop_index_sql = 'ALTER TABLE %s_%s DROP INDEX `%s`;'
     
     def __init__(self, app, model, column, name=None):
