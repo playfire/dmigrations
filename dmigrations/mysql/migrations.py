@@ -30,30 +30,7 @@ class Migration(BaseMigration):
             self.execute_sql(self.sql_down)
         else:
             raise IrreversibleMigrationError, 'No sql_down provided'
-    
-    def execute_sql(self, sql, return_rows=False):
-        "Executes sql, which can be a string or a list of strings"        
-        if isinstance(sql, basestring):
-            # Split string in to multiple statements
-            statements_re = re.compile(r";[ \t]*$", re.M)
-            statements = [s for s in statements_re.split(sql) if s.strip()]
-        else:
-            try:
-                # Assume each item in the iterable is already an individual statement
-                statements = iter(sql)
-            except TypeError:
-                assert False, 'sql argument must be string or iterable'
-        
-        from django.db import connection
-        cursor = connection.cursor()
-        
-        for statement in statements:
-            # Escape % due to format strings
-            cursor.execute(statement.replace('%', '%%'))
-        
-        if return_rows:
-            return cursor.fetchall()
-    
+
     def __str__(self):
         return 'Migration, up: %r, down: %r' % (self.sql_up, self.sql_down)
     
@@ -63,7 +40,8 @@ class Compound(BaseMigration):
     """
     def __init__(self, migrations=[]):
         self.migrations = migrations
-    
+        super(Compound, self).__init__()
+
     def run(self, direction, migs):
         successful = []
         try:
@@ -76,7 +54,7 @@ class Compound(BaseMigration):
                 'down': 'up',
             }[direction]
 
-            print >>sys.stderr, termcolors.colorize(
+            print >> sys.stderr, termcolors.colorize(
                 'Got exception, rolling back %d successful migrations' % len(successful),
                 fg='red'
             )
@@ -98,20 +76,95 @@ class Compound(BaseMigration):
         return 'Compound Migration: %s' % self.migrations
 
 
-class AddColumn(Migration):
+class TableAlteration(object):
+    reverse = False
+
+    def __init__(self, clause_up, clause_down):
+        if self.reverse:
+            clause_up, clause_down = clause_down, clause_up
+
+        self.clause_up = clause_up
+        self.clause_down = clause_down
+
+    def reversed(self):
+        import copy
+        c = copy.copy(self)
+        c.clause_up, c.clause_down = self.clause_down, self.clause_up
+        return c
+
+class AlterTable(BaseMigration):
+    reverse = False
+
+    def __init__(self, table_name, changes):
+        if self.reverse:
+            self.changes = list(reversed(changes))
+        else:
+            self.changes = changes
+        self.table_name = table_name
+        for c in changes:
+            assert isinstance(c, TableAlteration)
+
+        super(AlterTable, self).__init__()
+
+    def up(self):
+        clauses = ',\n  '.join(c.clause_up for c in self.changes)
+        sql = "ALTER TABLE `%s` %s;" % (self.table_name, clauses)
+        self.execute_sql([sql])
+
+    def down(self):
+        clauses = ',\n  '.join(c.clause_down for c in reversed(self.changes))
+        sql = "ALTER TABLE `%s` %s;" % (self.table_name, clauses)
+        self.execute_sql([sql])
+
+
+class AddColumn(AlterTable):
     "A migration that adds a database column"
-    
-    add_column_sql = 'ALTER TABLE `%(table)s` ADD COLUMN `%(colname)s` %(spec)s;'
-    drop_column_sql = 'ALTER TABLE `%(table)s` DROP COLUMN `%(colname)s`;'
-    constrain_to_table_sql = 'ALTER TABLE `%(table)s` ADD CONSTRAINT %(constraint)s' \
-        ' FOREIGN KEY (`%(colname)s`) REFERENCES `%(constraint_table)s` (`id`)%(ondelete)s;'
-    constrain_to_table_down_sql = 'ALTER TABLE `%(table)s` DROP FOREIGN KEY `%(constraint)s`;'
-    
+
+    class Alteration(TableAlteration):
+        add_column_sql = 'ADD COLUMN `%(colname)s` %(spec)s'
+        drop_column_sql = 'DROP COLUMN `%(colname)s`'
+
+        def __init__(self, column, spec, force_nulls=False):
+            self.column, self.spec = column, spec
+
+            args = {
+                'colname': column,
+                'spec': spec,
+            }
+            clause_up = self.add_column_sql % args
+            if force_nulls:
+                # if add_column_sql has NOT NULL in it, bin it
+                clause_up = clause_up.replace(" NOT NULL", "")
+            clause_down = self.drop_column_sql % args
+
+            super(AddColumn.Alteration, self).__init__(clause_up, clause_down)
+
+    class ConstraintAlteration(TableAlteration):
+        add_sql = 'ADD CONSTRAINT `%(constraint)s`' \
+            ' FOREIGN KEY (`%(colname)s`) REFERENCES `%(constraint_table)s` (`%(remote_col)s`)%(ondelete)s'
+        drop_sql = 'DROP FOREIGN KEY `%(constraint)s`'
+
+        def __init__(self, column, remote_table, constraint_name, remote_col='id', ondelete=''):
+            self.column = column
+            args = {
+                'colname': column,
+                'constraint': constraint_name,
+                'constraint_table': remote_table,
+                'remote_col': remote_col,
+                'ondelete': ' ON DELETE %s' % ondelete if ondelete else '',
+            }
+
+            clause_up = self.add_sql % args
+            clause_down = self.drop_sql % args
+
+            super(AddColumn.ConstraintAlteration, self).__init__(clause_up, clause_down)
+
     def __init__(self, app, model, column, spec, constrain_to_table=None, ondelete=''):
         model = model.lower()
-        self.app, self.model, self.column, self.spec = app, model, column, spec
-        table = '%s_%s' % (app.lower(), model)
+        self.app, self.model = app, model
+        table_name = '%s_%s' % (app.lower(), model)
         if constrain_to_table:
+            column = '%s_id' % column
             # this can only be used for ForeignKeys that link to another table's
             # id field. It is not for arbitrary relationships across tables!
             # Note also that this will create the ForeignKey field as allowing
@@ -120,43 +173,21 @@ class AddColumn(Migration):
             # the column without adding data to it. So you have to write another
             # migration later to change it from NULL to NOT NULL if you need to,
             # after you've populated it.
-            
+
             # add the FK constraint
-            constraint_name = "%s_refs_id_%x" % (column, abs(hash((model,constrain_to_table))))
+            constraint_name = self.fk_name(column, 'id', table_name, constrain_to_table)
 
-            args = {
-                'table': table,
-                'colname': '%s_id' % column,
-                'spec': spec,
-                'constraint': constraint_name,
-                'constraint_table': constrain_to_table,
-                'ondelete': ' ON DELETE %s' % ondelete if ondelete else '',
-            }
-
-            sql_up = [
-                self.add_column_sql % args,
-                self.constrain_to_table_sql % args,
-            ]
-
-            sql_down = [
-                self.constrain_to_table_down_sql % args,
-                self.drop_column_sql % args,
-            ]
-
-            # if add_column_sql has NOT NULL in it, bin it
-            sql_up[0] = sql_up[0].replace(" NOT NULL", "")
+            changes = [self.Alteration(column, spec, force_nulls=True),
+                       self.ConstraintAlteration(column,
+                                                 constrain_to_table,
+                                                 constraint_name,
+                                                 ondelete=ondelete)
+                       ]
         else:
-            args = {
-                'table': table,
-                'colname': column,
-                'spec': spec,
-            }
-            sql_up = [self.add_column_sql % args]
-            sql_down = [self.drop_column_sql % args]
-            
+            changes = [self.Alteration(column, spec)]
+
         super(AddColumn, self).__init__(
-            sql_up,
-            sql_down,
+            table_name, changes
         )
     
     def __str__(self):
@@ -169,37 +200,50 @@ class DropColumn(AddColumn):
     A migration that drops a database column. Needs the full column spec so 
     it can correctly create the down() method.
     """
-    def __init__(self, *args, **kwargs):
-        super(DropColumn, self).__init__(*args, **kwargs)
-        # Now swap over the sql_up and sql_down properties
-        self.sql_up, self.sql_down = self.sql_down, self.sql_up
+    reverse = True
+
+    class Alteration(AddColumn.Alteration):
+        reverse = True
+
+    class ConstraintAlteration(AddColumn.ConstraintAlteration):
+        reverse = True
 
     def __str__(self):
         return super(DropColumn, self).replace('AddColumn', 'DropColumn')
 
-class AddIndex(Migration):
+class AddIndex(AlterTable):
     "A migration that adds an index (and removes it on down())"
-    
-    add_index_sql = 'CREATE INDEX `%s` ON `%s_%s` (%s);'
-    drop_index_sql = 'ALTER TABLE %s_%s DROP INDEX `%s`;'
-    
+
+    class Alteration(TableAlteration):
+        add_index_sql = 'ADD INDEX `%(index)s` (%(cols)s)'
+        drop_index_sql = 'DROP INDEX `%(index)s`'
+
+        def __init__(self, columns, index_name):
+            args = {
+                'index': index_name,
+                'cols': ', '.join('`%s`' % c for c in columns),
+                }
+
+            super(AddIndex.Alteration, self).__init__(
+                self.add_index_sql % args,
+                self.drop_index_sql % args,
+                )
+
     def __init__(self, app, model, column, name=None):
         model = model.lower()
+        app = app.lower()
         self.app, self.model = app, model
+        table = '%s_%s' % (app, model)
+
         if isinstance(column, basestring):
             self.columns = [column]
         else:
             self.columns = column
-        if name:
-            index_name = name
-        else:
-            index_name = '%s_%s_%s' % (app, model, '_'.join(self.columns))
-        super(AddIndex, self).__init__(
-            sql_up = [self.add_index_sql % (index_name, app, model,
-                                            ', '.join('`%s`' % c for c in self.columns))],
-            sql_down = [self.drop_index_sql % (app, model, index_name)],
-        )
-    
+        index_name = name if name else '%s_%s' % (table, '_'.join(self.columns))
+
+        changes = [self.Alteration(self.columns, index_name)]
+        super(AddIndex, self).__init__(table, changes)
+
     def __str__(self):
         return "AddIndex: app: %s, model: %s, column: %s" % (
             self.app, self.model, self.column
@@ -207,10 +251,12 @@ class AddIndex(Migration):
 
 class DropIndex(AddIndex):
     "Drops an index"
-    def __init__(self, app, model, column):
-        super(DropIndex, self).__init__(app, model, column)
-        self.sql_up, self.sql_down = self.sql_down, self.sql_up
-    
+
+    reverse = True
+
+    class Alteration(AddIndex.Alteration):
+        reverse = True
+
     def __str__(self):
         return super(DropIndex, self).replace('AddIndex', 'DropIndex')
 
@@ -269,7 +315,7 @@ class RenameTable(Migration):
     def __repr__(self):
         return 'RenameTable(%s, %s)' % (self.oldname, self.newname)
 
-class ChangeColumn(Migration):
+class ChangeColumn(BaseMigration):
     def __init__(self, table, oldname, newname=None, old_def=None, new_def=None):
         self.table = table
         self.oldname = oldname
@@ -281,6 +327,8 @@ class ChangeColumn(Migration):
         assert (new_def and old_def) or (not new_def and not old_def), \
             'if you specify a new or old definition, you must specify both'
 
+        super(ChangeColumn, self).__init__()
+
     class AlreadyDone(Exception):
         pass
 
@@ -291,11 +339,7 @@ class ChangeColumn(Migration):
         pass
 
     def introspect_sql(self, from_name, to_name, to_definition):
-        from django.db import connection
-        cursor = connection.cursor()
-
-        cursor.execute('DESC `%s`' % self.table)
-        defs = list(cursor.fetchall())
+        defs = list(self.run_statements(['DESC `%s`' % self.table], return_rows=True))
 
         old_def, new_def = None, None
 
@@ -309,13 +353,13 @@ class ChangeColumn(Migration):
             if to_definition and to_name:
                 raise self.Failure('Cannot perform migration as column `%s` already exists.' % to_name)
             else:
-                raise self.AlreadyDone()
+                raise self.AlreadyDone('Column has already been renamed')
         elif new_def and old_def:
             raise self.Conflict('Cannot perform migration as column `%s` already exists.' % to_name)
         elif not old_def:
             raise self.Failure('Cannot perform migration as column `%s` does not exist.' % from_name)
 
-        coltype, null, key, default, extra = old_def[1:]
+        coltype, null, key, _, extra = old_def[1:]
         if key.upper() == 'PRI':
             raise self.Failure("I can't deal with primary keys! Aaargh! (`%s.%s`)" % (self.table, from_name))
         if extra:
@@ -325,7 +369,7 @@ class ChangeColumn(Migration):
         if to_definition:
             newdef = to_definition
         else:
-            nullclause = 'NOT NULL' if null.upper() == 'NO' else 'NULL';
+            nullclause = 'NOT NULL' if null.upper() == 'NO' else 'NULL'
             newdef = '%s %s' % (coltype, nullclause)
 
         return self.change_sql(from_name, to_name, newdef)
