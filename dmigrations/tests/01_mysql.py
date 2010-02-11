@@ -111,6 +111,50 @@ class TestAddDropIndex(DualTest):
         self.check(mig, drop_sql, add_sql)
 
 
+class TestAddDropDjangoKey(DualTest):
+    def test_plain(self):
+        m.AddDjangoKey.fk_name = classmethod(lambda cls, *args: 'yomama_123')
+
+        add_sql = ['ALTER TABLE `quiz_answer` ADD CONSTRAINT `mario` FOREIGN KEY (question_id) REFERENCES question (id)']
+        drop_sql = ['ALTER TABLE `quiz_answer` DROP FOREIGN KEY `mario`']
+
+        mig = m.AddDjangoKey('quiz_answer', 'question_id', 'question', 'id', keyname="mario")
+        self.check(mig, add_sql, drop_sql)
+
+        mig = m.DropDjangoKey('quiz_answer', 'question_id', 'question', 'id', keyname="mario")
+        self.check(mig, drop_sql, add_sql)
+
+    def test_fancy(self):
+        m.AddDjangoKey.fk_name = classmethod(lambda cls, *args: 'yomama_123')
+
+        add_sql = ['ALTER TABLE `quiz_answer` ADD CONSTRAINT `yomama_123` FOREIGN KEY (question_id) REFERENCES question (id)']
+        drop_sql = ['ALTER TABLE `quiz_answer` DROP FOREIGN KEY `yomama_123`']
+
+        mig = m.AddDjangoKey('quiz_answer', 'question_id', 'question')
+        self.check(mig, add_sql, drop_sql)
+
+        mig = m.DropDjangoKey('quiz_answer', 'question_id', 'question')
+        self.check(mig, drop_sql, add_sql)
+
+    def test_key_already_gone(self):
+        m.AddDjangoKey.fk_name = classmethod(lambda cls, *args: 'yomama_123')
+
+        add_sql = ['ALTER TABLE `quiz_answer` ADD CONSTRAINT `yomama_123` FOREIGN KEY (question_id) REFERENCES question (id)']
+        drop_sql = ['ALTER TABLE `quiz_answer` DROP FOREIGN KEY `yomama_123`']
+
+        from MySQLdb import OperationalError
+
+        mig = m.AddDjangoKey('quiz_answer', 'question_id', 'question')
+        self.check(mig, add_sql, drop_sql, down_behavior=StatementFailer)
+        self.assertRaises(OperationalError,
+                          lambda: self.check(mig, add_sql, drop_sql, up_behavior=StatementFailer))
+
+        mig = m.DropDjangoKey('quiz_answer', 'question_id', 'question')
+        self.check(mig, drop_sql, add_sql, up_behavior=StatementFailer)
+        self.assertRaises(OperationalError,
+                          lambda: self.check(mig, drop_sql, add_sql, down_behavior=StatementFailer))
+
+
 class TestChangeColumn(DualTest):
     def check(self, mig, add_sql, drop_sql):
         def get_faker():

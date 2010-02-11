@@ -260,6 +260,69 @@ class DropIndex(AddIndex):
     def __str__(self):
         return super(DropIndex, self).replace('AddIndex', 'DropIndex')
 
+class AddDjangoKey(Migration):
+    def __init__(self, table, col, f_table, f_col='id', reverse=False, keyname=None):
+        self.table = table
+        self.col = col
+        self.f_table = f_table
+        self.f_col = f_col
+        self.reverse = reverse
+        args = (table, col, f_table, f_col)
+
+        sqls = [
+            self.add_key_sql(key_name=keyname, *args),
+            self.drop_key_sql(key_name=keyname, *args),
+        ]
+
+        if reverse:
+            sqls.reverse()
+
+        super(AddDjangoKey, self).__init__(
+            sql_up=sqls[0], sql_down=sqls[1]
+        )
+
+    @classmethod
+    def add_key_sql(cls, table, col, dest_table, remote_col='id', key_name=None):
+        if key_name is None:
+            key_name = cls.fk_name(col, remote_col, table, dest_table)
+        return 'ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (%s) REFERENCES %s (%s)' \
+            % (table, key_name, col, dest_table, 'id')
+
+    @classmethod
+    def drop_key_sql(cls, table, col, dest_table, remote_col='id', key_name=None):
+        if key_name is None:
+            key_name = cls.fk_name(col, remote_col, table, dest_table)
+        return 'ALTER TABLE `%s` DROP FOREIGN KEY `%s`' % (table, key_name)
+
+    def run(self, direction):
+        assert direction in ('up', 'down')
+        from MySQLdb import OperationalError
+        try:
+            getattr(super(AddDjangoKey, self), direction)()
+        except OperationalError:
+            if (self.reverse and direction == 'up') or (not self.reverse and direction == 'down'):
+                # if this is the drop key part
+                print 'key is already gone'
+            else:
+                raise
+
+    def up(self):
+        self.run('up')
+
+    def down(self):
+        self.run('down')
+
+    def __repr__(self):
+        return "%sDjangoKey(*%r)" % (
+            "Drop" if self.reverse else "Add",
+            (self.table, self.col, self.f_table, self.f_col)
+        )
+
+class DropDjangoKey(AddDjangoKey):
+    def __init__(self, *args, **kwargs):
+        kwargs['reverse'] = True
+        super(DropDjangoKey, self).__init__(*args, **kwargs)
+
 class InsertRows(Migration):
     "Inserts some rows in to a table"
     
