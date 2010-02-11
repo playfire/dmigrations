@@ -40,4 +40,4 @@ class BaseMigration(object):
 
     @classmethod
     def fk_name(cls, col, remote_col, table, remote_table):
-        return '%s_refs_%s_%s' % (remote_col, col, cls.dig(remote_table, table))
+        return '%s_refs_%s_%s' % (remote_col, col, cls._digest(remote_table, table))
