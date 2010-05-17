@@ -4,7 +4,7 @@ command.
 """
 from django.core.management.base import CommandError
 from django.core.management.color import no_style
-from django.db import connection
+from django.db import connection, connections, DEFAULT_DB_ALIAS
 from django.db import models
 from django.conf import settings
 from dmigrations.generator_utils import save_migration
@@ -30,7 +30,7 @@ def add_app(args, output):
     app = models.get_app(app_label)
     from django.core.management.sql import sql_create
     
-    up_sql = sql_create(app, no_style())
+    up_sql = sql_create(app, no_style(), connections[DEFAULT_DB_ALIAS])
     down_sql = sql_delete(app, no_style())
     
     app_name = app.__name__.replace('.', '_')
