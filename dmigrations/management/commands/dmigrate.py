@@ -95,7 +95,7 @@ class Command(BaseCommand):
         elif args[0] == 'list':
             migration_state.init()
             for migration_name in migration_db.list():
-                if migration_state.is_applied(migration_name):
+                if migration_state.is_applied(migration_name, use_cache=True):
                    print "* [+] %s" % migration_name
                 else:
                    print "* [ ] %s" % migration_name

@@ -28,6 +28,7 @@ class MigrationState(object):
     def __init__(self, dev=None, migration_db=None):
         self.migration_db = migration_db
         self.dev = dev
+        self._applied_cache = None
     
     def migration_table_present(self):
         return table_present('dmigrations')
@@ -83,7 +84,19 @@ class MigrationState(object):
         if log:
             self.log('mark_as_unapplied', name)
       
-    def is_applied(self, name):
+    def applied_migrations(self):
+        cursor = _execute(
+            "SELECT migration FROM dmigrations"
+        )
+        return set(x[0] for x in cursor.fetchall())
+
+    def is_applied(self, name, use_cache=False):
+        if use_cache:
+            if self._applied_cache is None:
+                self._applied_cache = self.applied_migrations()
+
+            return name in self._applied_cache
+
         cursor = _execute(
             "SELECT * FROM dmigrations WHERE migration = %s", [name]
         )
