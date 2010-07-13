@@ -1,4 +1,5 @@
 import os, sys
+import time
 from django.core.management.base import BaseCommand, CommandError
 from optparse import make_option
 from django.conf import settings
@@ -42,6 +43,8 @@ class Command(BaseCommand):
             help='Exclude development migrations (DEV in the filename)'),
         make_option('--print-plan', action='store_true', dest='print_plan',
             help='Only print plan'),
+        make_option('--print-time', action='store_true', dest='print_time',
+            help='Time the migration and print the time in seconds to stdout.'),
     )
     requires_model_validation = False
     
@@ -65,6 +68,7 @@ class Command(BaseCommand):
             migration_state.init()
             for (migration_name, action) in migration_state.plan(*args):
                 migration = migration_db.load_migration_object(migration_name)
+                start_time = time.time()
                 if action == 'up':
                     if verbosity >= 1:
                         print "Applying migration %s" % migration.name
@@ -75,6 +79,8 @@ class Command(BaseCommand):
                         print "Unapplying migration %s" % migration.name
                     if not options.get('print_plan'):
                         migration_state.unapply(migration_name)
+                if options.get('print_time'):
+                    print "Migration %s ran %.1f seconds" % (migration.name, time.time() - start_time)
         
         elif args[0] == 'mark_as_applied':
             migration_state.init()
