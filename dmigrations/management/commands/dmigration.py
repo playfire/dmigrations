@@ -19,16 +19,7 @@ class Command(BaseCommand):
     requires_model_validation = True
     
     def handle(self, *args, **options):
-        import_path = getattr(settings, 'DMIGRATION_GENERATOR',
-            # Default generator depends on DATABASE_ENGINE
-            'dmigrations.%s.generator' % settings.DATABASE_ENGINE
-        )
-        try:
-            db_generator = __import__(import_path, {}, {}, [''])
-        except ImportError, e:
-            if settings.DATABASE_ENGINE == 'dummy':
-                print "You need to specify a DATABASE_ENGINE in your settings"
-            raise # Just let them see the error
+        import dmigrations.mysql.generator as db_generator
         
         available_args = db_generator.get_commands()
         if args:
