@@ -64,8 +64,7 @@ def add_table(args, output):
     tables = connection.introspection.table_names()
     known_models = set([
         model for model in connection.introspection.installed_models(tables)
-        if model not in app_models]
-    )
+    ])
     pending_references = {}
 
     sql_output, references = connection.creation.sql_create_model(
