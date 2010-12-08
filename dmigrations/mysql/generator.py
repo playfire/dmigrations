@@ -10,6 +10,7 @@ from django.conf import settings
 from dmigrations.generator_utils import save_migration
 
 import re, sys, pprint
+import logging
 
 def get_commands():
     return {
@@ -73,12 +74,13 @@ def add_table(args, output):
     up_sql.extend(sql_output)
     for refto, refs in references.items():
         pending_references.setdefault(refto, []).extend(refs)
-        if refto in known_models:
-            up_sql.extend(
-                connection.creation.sql_for_pending_references(
-                    refto, style, pending_references
-                )
+        if refto not in known_models:
+            logging.warning('FK to %s, a model not backed by a db table.' % refto)
+        up_sql.extend(
+            connection.creation.sql_for_pending_references(
+                refto, style, pending_references
             )
+        )
     up_sql.extend(
         connection.creation.sql_for_pending_references(
             model, style, pending_references
