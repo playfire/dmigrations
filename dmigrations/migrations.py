@@ -28,7 +28,11 @@ class BaseMigration(object):
 
         for statement in statements:
             # Escape % due to format strings
-            cursor.execute(statement.replace('%', '%%'))
+            try:
+                cursor.execute(statement.replace('%', '%%'))
+            except:
+                print "Exception running %r" % statement
+                raise
 
         if return_rows:
             return cursor.fetchall()
