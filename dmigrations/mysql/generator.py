@@ -90,9 +90,13 @@ def add_table(args, output):
     known_models.add(model_to_add)
 
     # Create the many-to-many join tables.
-    up_sql.extend(
-        connection.creation.sql_for_many_to_many(model_to_add, style)
-    )
+    for field in model_to_add._meta.fields:
+        try:
+            table, deferred = connection.creation.sql_for_inline_many_to_many_references(model_to_add, field, style)
+            assert False, "It's not clear that this is working"
+            up_sql.extend(table)
+        except AttributeError:
+            pass
     if not up_sql:
         raise Exception("Model %s in app %s not found" % (model, app_label))
     
