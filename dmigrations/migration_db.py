@@ -156,7 +156,7 @@ class MigrationDb(object):
             self.migration_number(migration) for migration in self.migrations
         ])
         
-        return u"%s/%03d_%s.py" % (self.directory, number, name)
+        return u"%s/%04d_%s.py" % (self.directory, number, name)
     
     def load_migration_object(self, name):
         """
